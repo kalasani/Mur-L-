@@ -1,0 +1,118 @@
+
+###########Table creation#################
+
+==>create external table retail_sales_prof_tab(Year int,
+Product_line string,          
+Product_type string,
+Product string,
+Order_method_type string,
+Retailer_country string,
+Revenue float,
+Planned_revenue float,
+Quantity int,
+Unit_cost float,
+Unit_price float,
+Gross_profit float,
+Unit_sale_price float
+)ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LOCATION '/murali/hive/example1/sales_profit_data' tblproperties("skip.header.line.count"="1");
+
+
+############Loading Data#################### no need to load if u specify the location of the data,it will automatically load the data in it if dataset exist in location
+
+load data inpath '/murali/WA_Retail-SalesMarketing_-ProfitCost.csv' into table retail_sales_prof_tab;
+
+##########Sample data##############
+select * from retail_sales_prof_tab limit 10;
+
+##########Counting No" of Rows#############
+select count(*) from retail_sales_prof_tab;
+
+
+#######################Partition################
+
+create external table retail_sales_prof_Part(Year int,Product_line string,Product_type string,Order_method_type string,Retailer_country string,Revenue float,Planned_revenue float,Quantity int,Unit_cost float,Unit_price float,Gross_profit float,Unit_sale_price float)partitioned by(Product string) location'/user/trainer1/muralik/sales_partitions';
+
+#####loading data into partitioned/clustered table######
+INSERT INTO TABLE retail_sales_prof_Part PARTITION(Product) select year,Product_line,Product_type,Order_method_type,Retailer_country,Revenue,Planned_revenue,Quantity,Unit_cost,Unit_price,Gross_profit,Unit_sale_price,Product from retail_sales_prof_tab;
+ 
+###########Querying Partitioned columns######################
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/waterbag_list'ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select * from retail_sales_prof_Part where Product='TrailChef Water Bag';
+
+####display product_lines names/years/Product_type/product/Order method type/Retailer country####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/dist_Product_lines'ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select distinct Product_line from retail_sales_prof_Part;
+
+####display distinct years ####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/dist_years'ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select distinct year from retail_sales_prof_Part;
+
+####display distinct Product_type ####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/dist_product_types'ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select distinct Product_type from retail_sales_prof_Part;
+
+####display distinct product ####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/dist_product' ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select distinct Product from retail_sales_prof_Part;
+
+####display distinct Order method type ####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/order_method_type' ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select distinct Order_method_type from retail_sales_prof_Part;
+
+
+######avg revenue of product line year wise#####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/avg_revenue_by_product_line' ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select year,product_line,avg(Revenue) from retail_sales_prof_Part group by year,product_line; 
+
+######sum revenue of product line year wise#####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/sum_of_rev_product_line_year_wise' ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+select year,product_line,sum(Revenue)  from retail_sales_prof_Part group by year,Product_line order by year desc; 
+
+######sum of revenue by product, year wise#####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/sum_of_rev_by_Product,Year' ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',' STORED AS TEXTFILE
+select year,Product,sum(Revenue) from retail_sales_prof_Part group by year,product order by  year desc;
+
+
+#####product order through Email#######
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/order_through_mail' ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' select product_line,Product,Retailer_country from retail_sales_prof_Part where Order_method_type="Mail";
+
+#####count products which are ordered by email based on country#########
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/count_of_product_ordered_by_mail' ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+select Retailer_country,Product,count(Product) from retail_sales_prof_Part where Order_method_type="Mail" group by Retailer_country,Product; 
+
+
+
+#####display product having no revenue by country#######
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/No_revenue_products' ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+select Retailer_country,Product from retail_sales_prof_Part where Revenue is null;
+
+########select product line  year wise max revenue generated Product_line##############
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/year_wise_max_rev_by_product_line' ROW FORMAT DELIMITED FIELDS TERMINATED BY ','select year,Product_line,max(Revenue) FROM retail_sales_prof_Part group by year,Product_line;
+
+#####Display the year wise Top Revenue generated by which product_line:#####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/Top_rev' ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+select * from retail_sales_prof_Part where Revenue in (select max(Revenue) as rev from retail_sales_prof_Part group by year)order by year;
+
+
+
+#####Display the year wise least Revenue generated by which product_line:#####
+insert overwrite directory '/user/trainer1/muralik/sales_profit_op/least_rev' ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+select * from retail_sales_prof_Part where Revenue in (select min(Revenue) as rev from retail_sales_prof_Part group by year)order by year;
+
+=====================================================================================================================================================
+
+
+
+
+
+
